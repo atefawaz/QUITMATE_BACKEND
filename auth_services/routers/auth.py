@@ -2,25 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from auth_services.database import get_db  # Updated import path
 from auth_services.models import User  # Updated import path
-from auth_services.schemas.user import UserCreate, UserResponse, Token, LoginRequest  # Updated import path
+from auth_services.schemas.user import UserCreate, UserResponse, Token, LoginRequest , RegisterResponse # Updated import path
 from auth_services.services.auth import hash_password, verify_password, create_access_token  # Updated import path
 
 router = APIRouter()
 
-@router.post("/register", response_model=UserResponse)
+@router.post("/register", response_model=RegisterResponse)
 def register(user: UserCreate, db: Session = Depends(get_db)):
-    """
-    Endpoint to register a new user.
-
-    Args:
-        user (UserCreate): The user details provided in the request body.
-        db (Session): The database session dependency.
-
-    Returns:
-        UserResponse: The registered user's details (excluding password).
-    """
     if user.password != user.confirm_password:
         raise HTTPException(status_code=400, detail="Passwords do not match")
+
     existing_user = db.query(User).filter(User.email == user.email).first()
     if existing_user:
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -31,12 +22,31 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
         lastname=user.lastname,
         date_of_birth=user.date_of_birth,
         email=user.email,
-        password_hash=hashed_password  # Updated field name
+        password_hash=hashed_password
     )
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
-    return new_user
+
+    # Generate JWT token
+    token_data = {"sub": new_user.email, "user_id": new_user.id}
+    access_token = create_access_token(data=token_data)
+
+    # Redirect URL with token
+    questionnaire_url = f"http://localhost:8001/questionnaire?token={access_token}"
+
+    return {
+        "id": new_user.id,
+        "firstname": new_user.firstname,
+        "lastname": new_user.lastname,
+        "email": new_user.email,
+        "date_of_birth": new_user.date_of_birth,
+        "message": "User registered successfully. Please complete the questionnaire.",
+        "redirect_url": questionnaire_url,
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+
 
 @router.post("/login", response_model=Token)
 def login(user: LoginRequest, db: Session = Depends(get_db)):
