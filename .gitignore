@@ -34,3 +34,7 @@ tmp/
 temp/
 .venv
 .env
+
+__pycache__/
+*.pyc
+
