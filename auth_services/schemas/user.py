@@ -30,3 +30,17 @@ class LoginRequest(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    
+class RegisterResponse(BaseModel):
+    id: int
+    firstname: str
+    lastname: str
+    email: EmailStr
+    date_of_birth: date
+    message: str
+    redirect_url: str
+    access_token: str
+    token_type: str
+
+    class Config:
+        orm_mode = True
