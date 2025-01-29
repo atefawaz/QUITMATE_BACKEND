@@ -1,7 +1,15 @@
 from bcrypt import hashpw, gensalt, checkpw
-from jose import jwt
+from jose import jwt, JWTError
 from datetime import datetime, timedelta
-from auth_services.config import settings  # Updated import for settings
+from sqlalchemy.orm import Session
+from fastapi import Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordBearer
+from auth_services.config import settings
+from auth_services.database import get_db
+from auth_services.models import User
+
+# OAuth2 scheme for extracting the token
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 # Hash password
 def hash_password(password: str) -> str:
@@ -46,3 +54,28 @@ def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes
     expire = datetime.utcnow() + expires_delta
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
+
+# Get current user from JWT token
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    """
+    Decodes the JWT token to retrieve the current authenticated user.
+
+    Args:
+        token (str): The JWT token.
+        db (Session): Database session.
+
+    Returns:
+        User: The current authenticated user.
+    """
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        user_id: int = payload.get("user_id")
+        if user_id is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
+
+    user = db.query(User).filter(User.id == user_id).first()
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    return user
