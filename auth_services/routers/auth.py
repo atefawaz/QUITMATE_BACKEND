@@ -4,6 +4,9 @@ from auth_services.database import get_db  # Updated import path
 from auth_services.models import User  # Updated import path
 from auth_services.schemas.user import UserCreate, UserResponse, Token, LoginRequest , RegisterResponse # Updated import path
 from auth_services.services.auth import hash_password, verify_password, create_access_token  # Updated import path
+from auth_services.schemas.user import Token
+from auth_services.services.auth import verify_password, create_access_token
+
 
 router = APIRouter()
 
@@ -48,23 +51,18 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
     }
 
 
+
+
 @router.post("/login", response_model=Token)
 def login(user: LoginRequest, db: Session = Depends(get_db)):
     """
-    Endpoint to log in a user.
-
-    Args:
-        user (LoginRequest): The login credentials provided in the request body.
-        db (Session): The database session dependency.
-
-    Returns:
-        Token: The access token for the authenticated user.
+    Login endpoint that accepts JSON payload instead of form data.
     """
-    # Check if the user exists
     db_user = db.query(User).filter(User.email == user.email).first()
-    if not db_user or not verify_password(user.password, db_user.password_hash):  # Updated field name
-        raise HTTPException(status_code=400, detail="Invalid credentials")
     
-    # Generate a token
-    token = create_access_token({"sub": db_user.email})
+    if not db_user or not verify_password(user.password, db_user.password_hash):
+        raise HTTPException(status_code=400, detail="Invalid credentials")
+
+    token = create_access_token({"sub": db_user.email, "user_id": db_user.id})
+    
     return {"access_token": token, "token_type": "bearer"}
