@@ -1,3 +1,4 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from plan_services.database import get_db
@@ -8,13 +9,17 @@ from auth_services.services.auth import get_current_user
 
 router = APIRouter()
 
+# ✅ Fix: Initialize logger in `plan_routes.py`
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 @router.post("/generate_plan", response_model=PlanResponse)
 def generate_plan(
     db: Session = Depends(get_db),  
     current_user = Depends(get_current_user)
 ):
     """Generate and save a personalized quitting plan"""
-    print(f"📢 Generating plan for user {current_user.id}")
+    logger.info(f"📢 Generating plan for user {current_user.id}")
 
     # Fetch token from request headers
     token = current_user.token if hasattr(current_user, "token") else None
@@ -24,7 +29,8 @@ def generate_plan(
     plan = create_quit_plan(user_id=current_user.id, token=token, db=db)
     
     if not plan:
-        raise HTTPException(status_code=400, detail="No plan generated. User might not have a questionnaire.")
+        logger.warning("❌ No plan generated. User might not have completed the questionnaire.")
+        raise HTTPException(status_code=400, detail="No plan generated.")
 
     return plan
 

@@ -1,38 +1,36 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import Base, engine
 from .routers import plan_routes
-import logging
-
 
 app = FastAPI()
 
-
-# ✅ Create a logger instance
-logger = logging.getLogger(__name__)
+# ✅ Fix: Initialize logger properly
 logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# ✅ Allow requests from frontend (React at localhost:3000)
+# ✅ Fix CORS: Allow frontend access
 origins = [
-    "http://localhost:3000",
-    "http://127.0.0.1:3000"
+    "http://localhost:3000",  # Frontend URL
+    "http://127.0.0.1:3000"   # Alternative localhost
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,  # ✅ Allow specific frontend origins
+    allow_origins=origins,  
     allow_credentials=True,
-    allow_methods=["*"],  # ✅ Allow all HTTP methods (GET, POST, etc.)
-    allow_headers=["*"],  # ✅ Allow all headers
+    allow_methods=["*"],  
+    allow_headers=["*"],  
 )
 
-
+# ✅ Create tables in the database
 Base.metadata.create_all(bind=engine)
 
-# Include API routes
+# ✅ Include API routes
 app.include_router(plan_routes.router, prefix="/plan", tags=["Quitting Plan"])
 
 @app.get("/")
 def root():
-    """Root endpoint to check if service is running"""
+    """Root endpoint to check if the service is running"""
     return {"message": "Welcome to the Quitting Plan Service!"}
