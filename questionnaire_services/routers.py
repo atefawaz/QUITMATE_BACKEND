@@ -1,3 +1,4 @@
+import requests
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from questionnaire_services.database import get_db
@@ -5,14 +6,8 @@ from questionnaire_services.models import Questionnaire
 from questionnaire_services.schemas import QuestionnaireCreate, QuestionnaireResponse
 from auth_services.services.auth import get_current_user
 from auth_services.models import User
-from fastapi.responses import JSONResponse
-import logging
 
 router = APIRouter()
-
-# Enable logging for debugging
-logging.basicConfig(level=logging.DEBUG)
-logger = logging.getLogger(__name__)
 
 @router.post("/submit", response_model=QuestionnaireResponse)
 def submit_questionnaire(
@@ -20,49 +15,36 @@ def submit_questionnaire(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    try:
-        logger.info(f"Submitting questionnaire for user {current_user.id}")
 
-        new_questionnaire = Questionnaire(
-            user_id=current_user.id,
-            daily_cigarettes=questionnaire.daily_cigarettes,
-            quitting_speed=questionnaire.quitting_speed,
-            high_risk_times=questionnaire.high_risk_times,
-            notification_preference=questionnaire.notification_preference,
-            first_cigarette_time=questionnaire.first_cigarette_time,
-            smoking_triggers=questionnaire.smoking_triggers,
-            previous_quit_attempts=questionnaire.previous_quit_attempts,
-            previous_methods=questionnaire.previous_methods,
-            health_goals=questionnaire.health_goals,
-            preferred_timeline=questionnaire.preferred_timeline,
-            smoking_context=questionnaire.smoking_context,
-        )
+    # ✅ Check if the user already has a questionnaire
+    existing_questionnaire = db.query(Questionnaire).filter(Questionnaire.user_id == current_user.id).first()
+    if existing_questionnaire:
+        raise HTTPException(status_code=400, detail="User has already submitted a questionnaire.")
 
-        db.add(new_questionnaire)
-        db.commit()
-        db.refresh(new_questionnaire)
+    # ✅ Store the questionnaire in the database
+    new_questionnaire = Questionnaire(**questionnaire.dict(), user_id=current_user.id)
+    db.add(new_questionnaire)
+    db.commit()
+    db.refresh(new_questionnaire)
 
-        # ✅ Convert SQLAlchemy model to a serializable dictionary
-        response_content = {
-            "id": new_questionnaire.id,
-            "user_id": new_questionnaire.user_id,
-            "daily_cigarettes": new_questionnaire.daily_cigarettes,
-            "quitting_speed": new_questionnaire.quitting_speed,
-            "high_risk_times": new_questionnaire.high_risk_times,
-            "notification_preference": new_questionnaire.notification_preference,
-            "first_cigarette_time": str(new_questionnaire.first_cigarette_time),  # Convert datetime to string
-            "smoking_triggers": new_questionnaire.smoking_triggers,
-            "previous_quit_attempts": new_questionnaire.previous_quit_attempts,
-            "previous_methods": new_questionnaire.previous_methods,
-            "health_goals": new_questionnaire.health_goals,
-            "preferred_timeline": new_questionnaire.preferred_timeline,
-            "smoking_context": new_questionnaire.smoking_context,
-            "created_at": new_questionnaire.created_at.isoformat()  # Convert datetime to string
-        }
+    # ✅ Trigger quitting plan generation
+    plan_response = requests.post(
+        "http://127.0.0.1:8002/plan/generate_plan",
+        headers={"Authorization": f"Bearer {current_user.token}"}  # Ensure token is sent
+    )
 
-        # ✅ Return a proper JSON response
-        return JSONResponse(content=response_content)
+    if plan_response.status_code != 200:
+        print(f"❌ Failed to generate plan. Response: {plan_response.json()}")
+        raise HTTPException(status_code=400, detail="Plan generation failed")
 
-    except Exception as e:
-        logger.error(f"Error submitting questionnaire: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Internal Server Error")
+    print(f"✅ Quit plan generated successfully for user {current_user.id}")
+
+    return new_questionnaire
+
+
+@router.get("/{user_id}")
+def get_questionnaire(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    questionnaire = db.query(Questionnaire).filter(Questionnaire.user_id == user_id).first()
+    if not questionnaire:
+        raise HTTPException(status_code=404, detail="Questionnaire not found")
+    return questionnaire
