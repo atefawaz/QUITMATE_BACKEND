@@ -18,15 +18,30 @@ app = FastAPI(
     openapi_tags=[{"name": "Authentication", "description": "Operations related to user authentication"}]
 )
 
-# CORS Middleware for frontend communication
+origins = [
+    "http://localhost:8081",  # Your frontend in Expo
+    "http://127.0.0.1:8081",
+    "http://localhost:3000",  # If running on port 3000
+    "http://127.0.0.1:3000",
+    "http://localhost:8082",  # React Native Web on Mac
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Adjust as needed for your frontend
+    allow_origins=origins,  # Allow only specific frontend origins
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
 )
 
+# ✅ Enable CORS Middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,  # Allow specific frontend origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
+    allow_headers=["*"],  # Allow all headers
+)
 # Create all tables in the database
 Base.metadata.create_all(bind=engine)
 
