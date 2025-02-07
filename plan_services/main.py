@@ -1,12 +1,14 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from questionnaire_services.database import Base, engine
-from questionnaire_services.routers import router as questionnaire_router
+from .database import Base, engine
+from .routers import plan_routes
 
-# Initialize FastAPI app
 app = FastAPI()
 
-
+# ✅ Fix: Initialize logger properly
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 origins = [
@@ -24,13 +26,13 @@ app.add_middleware(
     allow_methods=["*"],  # Allow all HTTP methods (GET, POST, etc.)
     allow_headers=["*"],  # Allow all headers
 )
-
-# Create database tables
+# ✅ Create tables in the database
 Base.metadata.create_all(bind=engine)
 
-# Include questionnaire routes
-app.include_router(questionnaire_router, prefix="/questionnaire", tags=["Questionnaire"])
+# ✅ Include API routes
+app.include_router(plan_routes.router, prefix="/plan", tags=["Quitting Plan"])
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to the Questionnaire Service!"}
+    """Root endpoint to check if the service is running"""
+    return {"message": "Welcome to the Quitting Plan Service!"}

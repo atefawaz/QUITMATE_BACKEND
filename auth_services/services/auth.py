@@ -55,17 +55,65 @@ def create_access_token(data: dict, expires_delta: timedelta = timedelta(minutes
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.secret_key, algorithm=settings.algorithm)
 
-# Get current user from JWT token
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+
+# def get_current_user(
+#     token: str = Depends(oauth2_scheme), 
+#     db: Session = Depends(get_db)
+# ) -> User:
+#     """
+#     Decodes the JWT token and retrieves the authenticated user.
+
+#     Args:
+#         token (str): JWT access token.
+#         db (Session): Database session.
+
+#     Returns:
+#         User: Authenticated user object with token.
+#     """
+#     try:
+#         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+#         user_id: int = payload.get("user_id")
+#         if user_id is None:
+#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
+#     except JWTError:
+#         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
+
+#     user = db.query(User).filter(User.id == user_id).first()
+#     if user is None:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    
+#     # ✅ Attach token to user object for further requests
+#     setattr(user, "token", token)
+
+#     return { user , user_id}
+
+
+# def get_current_user(
+#     token: str = Depends(oauth2_scheme), 
+#     db: Session = Depends(get_db)
+# ) -> User:
+#     try:
+#         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+#         user_id: int = payload.get("user_id")
+#         if user_id is None:
+#             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
+#     except JWTError:
+#         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid authentication token")
+
+#     user = db.query(User).filter(User.id == user_id).first()
+#     if user is None:
+#         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+#     return user  
+
+
+
+def get_current_user(
+    token: str = Depends(oauth2_scheme), 
+    db: Session = Depends(get_db)
+) -> User:
     """
-    Decodes the JWT token to retrieve the current authenticated user.
-
-    Args:
-        token (str): The JWT token.
-        db (Session): Database session.
-
-    Returns:
-        User: The current authenticated user.
+    Decodes the JWT token and retrieves the authenticated user.
     """
     try:
         payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
@@ -78,4 +126,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(User).filter(User.id == user_id).first()
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
-    return user
+
+    # ✅ Attach token to user object
+    setattr(user, "token", token)
+
+    return user  # ✅ Return only the user object, not a set

@@ -5,9 +5,9 @@ from auth_services.models import User  # Updated import path
 from auth_services.schemas.user import UserCreate, UserResponse, Token, LoginRequest , RegisterResponse # Updated import path
 from auth_services.services.auth import hash_password, verify_password, create_access_token  # Updated import path
 from auth_services.schemas.user import Token
-from auth_services.services.auth import verify_password, create_access_token
+from auth_services.services.auth import verify_password, create_access_token , get_current_user 
 
-
+BLACKLISTED_TOKENS = set()
 router = APIRouter()
 
 @router.post("/register", response_model=RegisterResponse)
@@ -53,16 +53,34 @@ def register(user: UserCreate, db: Session = Depends(get_db)):
 
 
 
-@router.post("/login", response_model=Token)
+
+@router.post("/login")
 def login(user: LoginRequest, db: Session = Depends(get_db)):
-    """
-    Login endpoint that accepts JSON payload instead of form data.
-    """
     db_user = db.query(User).filter(User.email == user.email).first()
     
     if not db_user or not verify_password(user.password, db_user.password_hash):
         raise HTTPException(status_code=400, detail="Invalid credentials")
 
+    # user_block = get_current_user()
+    # print(user_block)
+    user_num_id = db_user.id
+
     token = create_access_token({"sub": db_user.email, "user_id": db_user.id})
+
+    print(user_num_id)
     
-    return {"access_token": token, "token_type": "bearer"}
+    return {
+        "access_token": token,
+        "token_type": "bearer",
+        "user_num_id": user_num_id  # ✅ Add user_id here
+    }
+
+
+@router.post("/auth/logout")
+async def logout(current_user: dict = Depends(get_current_user)):
+    token = current_user.get("token")  # Get the current token from user session
+    if not token:
+        raise HTTPException(status_code=400, detail="Invalid token")
+    
+    BLACKLISTED_TOKENS.add(token)  # Add token to blacklist
+    return {"message": "Successfully logged out"}
